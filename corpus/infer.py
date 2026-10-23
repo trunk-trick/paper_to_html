@@ -297,6 +297,7 @@ def generate(tok, model, prompts, max_new_tokens):
                 except torch.cuda.OutOfMemoryError:
                     print(f"skip page {i}: {m} tokens OOM even alone",
                           flush=True)
+                    shrink_budget(m, min(max_new_tokens, 2048))
                 finally:
                     del one
                     torch.cuda.empty_cache()
@@ -334,6 +335,20 @@ def token_budget(model, reserve=512 << 20):
     kv = getattr(c, "num_key_value_heads", heads)
     per = c.num_hidden_layers * 2 * kv * hd * 2
     return int(min(CTX, max(2048, (free - reserve) // per)))
+
+
+def shrink_budget(prompt_tokens, answer_tokens):
+    """After an OOM, trust the measurement over the estimate.
+
+    Free VRAM at load time is an estimate of a card that other things also
+    use; a prompt that actually failed is a fact.  Lower the per-request
+    budget so the next split is small enough to fit, and say so once.
+    """
+    global LIMIT
+    new = max(2048, prompt_tokens - answer_tokens)
+    if new < LIMIT:
+        LIMIT = new
+        print(f"  per-request budget lowered to {new} tokens", flush=True)
 
 
 def prompt_for(rec, pno, lo, hi, with_graphics=True):
@@ -397,7 +412,12 @@ def labels_span(tok, model, rec, pno, lo, hi, max_new, depth=0):
         return (labels_span(tok, model, rec, pno, lo, mid, max_new, depth + 1)
                 + labels_span(tok, model, rec, pno, mid, hi, max_new,
                               depth + 1))
-    budget = min(max_new, max(256, LIMIT - L - 64))
+    # An answer is one index per line plus the block scaffolding: asking for
+    # four tokens a line is generous, and asking for 4k on a card that has
+    # barely a gigabyte to spare is how a page that fits gets OOM-killed by
+    # its own answer budget.
+    want = min(max_new, 256 + 4 * n)
+    budget = min(want, max(256, LIMIT - L - 64))
     out = generate(tok, model, [pr], budget)[0]
     lab, _ = parse_labels(out, n)
     if lab is None:
