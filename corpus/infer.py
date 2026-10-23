@@ -20,6 +20,7 @@ same path, so a bad page in gold mode is a renderer bug, not a model bug.
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -83,6 +84,28 @@ def parse_labels(text, nlines):
     missing = [i for i in range(nlines) if i not in seen]
     blocks.extend({"r": "drop", "l": [i]} for i in missing)
     return blocks, len(missing)
+
+
+def write_json(path, obj):
+    """Write a JSON file that a later process can only see whole.
+
+    `write_text` truncates the old file and then writes the new one, so a
+    reader that arrives in between -- or a run that is looking at an output
+    directory another run is also writing -- gets a mix of old and new bytes
+    and a parse error far away from the cause.  Write beside it and rename,
+    which the filesystem makes atomic.  Then read it back once: a write that
+    did not survive the trip should fail here, next to the code that made it.
+    """
+    blob = json.dumps(obj, ensure_ascii=False)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(blob, encoding="utf-8")
+    os.replace(tmp, path)
+    try:
+        json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as e:
+        head = path.read_bytes()[:120]
+        raise SystemExit(f"{path} did not survive being written: {e}\n"
+                         f"  {len(head)} bytes start with {head!r}") from None
 
 
 def base_of(adapter):
@@ -494,7 +517,7 @@ def main():
     if a.limit and a.limit < len(rec["pages"]):
         print(f"first {a.limit} of {len(rec['pages'])} pages", flush=True)
         rec["pages"] = rec["pages"][:a.limit]
-    rec_path.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    write_json(rec_path, rec)
 
     if a.gold:
         labels = [render_gold(pg) for pg in rec["pages"]]
@@ -542,7 +565,7 @@ def main():
                 print(f"page {pno}: retry no better ({miss} dropped)")
 
     lab_path = out / "labels.json"
-    lab_path.write_text(json.dumps(labels, ensure_ascii=False), encoding="utf-8")
+    write_json(lab_path, labels)
 
     cmd = [sys.executable, str(HERE.parent / "reading_build" / "render.py"),
            "--pdf", a.pdf, "--rec", str(rec_path),

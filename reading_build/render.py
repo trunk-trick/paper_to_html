@@ -233,6 +233,21 @@ def crop(page, rect, dest, dpi=200):
     return pix.width, pix.height
 
 
+def load_json(path):
+    """json.load with the head of the file in the error.
+
+    A record that fails to parse is usually an interrupted or concurrent
+    write rather than a bug in the generator, and "Extra data: line 1
+    column 6" says nothing about which.  Show what is actually in the file.
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except ValueError as e:
+        head = open(path, "rb").read(160)
+        raise SystemExit(f"{path}: {e}\n  first bytes: {head!r}") from None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pdf", required=True)
@@ -246,7 +261,7 @@ def main():
 
     out = Path(a.out)
     (out / "img").mkdir(parents=True, exist_ok=True)
-    rec = json.load(open(a.rec, encoding="utf-8"))
+    rec = load_json(a.rec)
     if a.labels == "gold":                 # self-test: the teacher's own labels
         labels = [gold_labels(pg) for pg in rec["pages"]]
     else:
