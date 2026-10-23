@@ -306,6 +306,7 @@ def generate(tok, model, prompts, max_new_tokens):
     return outs
 
 
+CTX = 32768        # Qwen3-4B's context, prompt plus answer
 
 # Tokens one request may carry on *this* card, prompt plus answer.  The
 # context is the model's ceiling; the free VRAM after the weights are loaded
