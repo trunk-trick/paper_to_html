@@ -37,7 +37,8 @@ app = FastAPI(title="pdf2reading")
 jobs = {}
 lock = threading.Lock()
 queue = Queue()
-opts = argparse.Namespace(load_4bit=False, max_new=2048)
+opts = argparse.Namespace(load_4bit=False, load_8bit=False,
+                          max_new=2048)
 
 
 def worker():
@@ -53,6 +54,8 @@ def worker():
                "--max-new", str(opts.max_new)]
         if opts.load_4bit:
             cmd.append("--load-4bit")
+        if opts.load_8bit:
+            cmd.append("--load-8bit")
         try:
             with open(WORK / job_id / "convert.log", "w") as log:
                 rc = subprocess.call(cmd, stdout=log, stderr=subprocess.STDOUT)
@@ -129,9 +132,11 @@ def main():
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--load-4bit", action="store_true")
+    ap.add_argument("--load-8bit", action="store_true")
     ap.add_argument("--max-new", type=int, default=2048)
     a = ap.parse_args()
-    opts.load_4bit, opts.max_new = a.load_4bit, a.max_new
+    opts.load_4bit, opts.load_8bit = a.load_4bit, a.load_8bit
+    opts.max_new = a.max_new
     WORK.mkdir(exist_ok=True)
     threading.Thread(target=worker, daemon=True).start()
     import uvicorn

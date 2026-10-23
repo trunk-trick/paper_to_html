@@ -18,23 +18,32 @@ A worked example, produced by exactly this checkout, is in
 [`examples/How_to_poop/`](examples/How_to_poop/index.html) — open the HTML
 next to the original PDF.
 
-## Install
-
-Python 3.10+, an NVIDIA card.
+## Quick start
 
 ```bash
-./setup.sh              # CUDA 12.8 wheels: needed by RTX 50, fine on older cards
-./setup.sh cu124        # older driver
+git clone https://github.com/trunk-trick/paper_to_html.git
+cd paper_to_html
+./setup.sh                                  # venv, torch, deps, base model (8 GB download)
+python pdf2reading.py paper.pdf -o out/paper --load-8bit
 ```
 
-For an 8 GB card (RTX 5060, 4060, 3060) also install the quantised path:
+That is the whole install: `setup.sh` builds `.venv`, installs a `cu128`
+torch (needed by RTX 50, fine on every older card), installs the rest of
+`requirements.txt`, and fetches the base model. Open `out/paper/index.html`.
+
+**On an 8 GB card** (RTX 5060, 4060, 3060) use `--load-8bit`, and install the
+quantised path once:
 
 ```bash
-pip install bitsandbytes>=0.46
+. .venv/bin/activate && pip install bitsandbytes>=0.46
 ```
 
-An RTX 50 card needs a `cu128` or newer wheel — `torch 2.7` is the first
-build with sm_120 kernels. `setup.sh` defaults to it.
+A 16 GB card can drop both the flag and bitsandbytes. A 6 GB card needs
+`--load-4bit`; see [Hardware](#hardware) for what that costs.
+
+Older driver: `./setup.sh cu124`. Python 3.10+ and an NVIDIA card are
+required. `download_model.py --mirror` or `--modelscope` fetches through a
+mirror if the Hugging Face hub is slow.
 
 ## Use
 
@@ -53,7 +62,7 @@ page looks wrong in `--gold` too, the bug is in the renderer, not the model.
 As a service:
 
 ```bash
-python serve.py --port 8000                 # add --load-4bit on an 8 GB card
+python serve.py --port 8000                 # add --load-8bit on an 8 GB card
 curl -F file=@paper.pdf http://localhost:8000/convert      # -> {"id": ...}
 curl http://localhost:8000/jobs/<id>                        # -> {"state": "done", "page": ...}
 ```
