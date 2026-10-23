@@ -217,6 +217,11 @@ def load_model(adapter, load_4bit=False, load_8bit=False):
         raise
     model = PeftModel.from_pretrained(model, adapter)
     model.eval()
+    global LIMIT
+    LIMIT = token_budget(model)
+    if LIMIT < CTX:
+        print(f"tokens per request: {LIMIT} of {CTX} -- the rest of the card "
+              f"is not free; longer pages are split", flush=True)
     return tok, model
 
 
@@ -237,14 +242,16 @@ def generate(tok, model, prompts, max_new_tokens):
                                      add_generation_prompt=True)
              for p in prompts]
     enc = [tok(t)["input_ids"] for t in texts]
-    MAX_PAGE = 32000       # beyond this a page cannot be served on this card
     BUDGET = 9000          # padded tokens per generation step
     outs = [""] * len(texts)
     groups, cur, curmax = [], [], 0
     for idx in sorted(range(len(texts)), key=lambda i: len(enc[i])):
         L = len(enc[idx])
-        if L > MAX_PAGE:
-            print(f"skip page: {L} tokens > {MAX_PAGE}", flush=True)
+        if L + max_new_tokens + 64 > LIMIT:
+            # too big for this card in one piece: leave it to the retry
+            # pass, which splits it and drops the artwork if it has to
+            print(f"page {idx}: {L} tokens will not fit ({LIMIT} max); "
+                  f"queued for a split", flush=True)
             continue
         newmax = max(curmax, L)
         if cur and (len(cur) >= 4 or newmax * (len(cur) + 1) > BUDGET):
@@ -299,8 +306,33 @@ def generate(tok, model, prompts, max_new_tokens):
     return outs
 
 
-CTX = 32768        # Qwen3-4B's context, prompt plus answer
-MAX_PAGE = 30000   # a page larger than this has to be split
+
+# Tokens one request may carry on *this* card, prompt plus answer.  The
+# context is the model's ceiling; the free VRAM after the weights are loaded
+# is usually a much lower one.  On an 8 GB card the 8-bit model leaves about
+# a gigabyte, which is roughly 7k tokens of KV cache -- so a 28k-token page
+# does not fail because it is long, it fails because it cannot fit, and the
+# split decision has to be made against this number rather than against 32k.
+LIMIT = CTX
+
+
+def token_budget(model, reserve=512 << 20):
+    """Tokens per request that fit beside the loaded model, and why.
+
+    KV cache per token is layers x 2 (K and V) x kv heads x head width x 2
+    bytes.  A 512 MB reserve covers activations and the allocator's slack.
+    """
+    try:
+        import torch
+        free, _ = torch.cuda.mem_get_info()
+    except Exception:
+        return CTX
+    c = model.config
+    heads = getattr(c, "num_attention_heads", 32)
+    hd = getattr(c, "head_dim", None) or c.hidden_size // heads
+    kv = getattr(c, "num_key_value_heads", heads)
+    per = c.num_hidden_layers * 2 * kv * hd * 2
+    return int(min(CTX, max(2048, (free - reserve) // per)))
 
 
 def prompt_for(rec, pno, lo, hi, with_graphics=True):
@@ -350,18 +382,21 @@ def labels_span(tok, model, rec, pno, lo, hi, max_new, depth=0):
 
     pr = prompt_for(rec, pno, lo, hi)
     L = ntok(pr)
-    if L + 128 > CTX:
-        # artwork is a hint; the lines are the job
+    if L + max_new + 64 > LIMIT:
+        # artwork is a hint; the lines are the job.  On a page drawn rule by
+        # rule the rectangles outweigh the text several times over, and
+        # dropping them is what decides between a served page and a dropped
+        # one -- so this runs before splitting, not only at the context edge.
         pr2 = prompt_for(rec, pno, lo, hi, with_graphics=False)
         L2 = ntok(pr2)
         if L2 < L:
             pr, L = pr2, L2
-    if L + max_new + 64 > CTX and n > 8 and depth < 6:
+    if L + max_new + 64 > LIMIT and n > 8 and depth < 6:
         mid = lo + n // 2
         return (labels_span(tok, model, rec, pno, lo, mid, max_new, depth + 1)
                 + labels_span(tok, model, rec, pno, mid, hi, max_new,
                               depth + 1))
-    budget = min(max_new, max(256, CTX - L - 64))
+    budget = min(max_new, max(256, LIMIT - L - 64))
     out = generate(tok, model, [pr], budget)[0]
     lab, _ = parse_labels(out, n)
     if lab is None:
@@ -452,7 +487,9 @@ def main():
             n = len(pg["lines"])
             lab, miss = parse_labels(text, n) if text else (None, n)
             if lab is None:
-                print(f"page {pno}: unparseable output, all lines dropped")
+                why = ("did not fit this card, splitting it"
+                       if not text else "unparseable output")
+                print(f"page {pno}: {why}, all lines dropped for now")
                 lab = [{"r": "drop", "l": [i]} for i in range(n)]
                 miss = n
             print(f"page {pno}: {n} lines, "

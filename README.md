@@ -122,6 +122,22 @@ same sample it merged five blocks and lost a caption, so the figure vanished.
 Peak VRAM moves with page length, because the KV cache grows with the page.
 The numbers above are a median page; a 300-line page roughly doubles them.
 
+On an 8 GB card most of the memory is spent before the first page: the 8-bit
+weights, the desktop, and CUDA's own context leave well under a gigabyte,
+which at 144 KB per token of KV cache is only a few thousand tokens. The
+converter prints what it computed —
+
+```
+tokens per request: 6812 of 32768 -- the rest of the card is not free;
+longer pages are split
+```
+
+— and splits any page that would not fit, dropping that page's artwork
+rectangles first, because on a rule-drawn page the rectangles can outweigh
+the text several times over. A paper whose pages are all that heavy is slow
+on 8 GB (a split page costs several generations); `--load-4bit` leaves room
+for them whole, at the cost described above.
+
 An RTX 50 card needs a `cu128` or newer torch wheel -- `torch 2.7` is the
 first build with sm_120 kernels. `setup.sh` defaults to it.
 
