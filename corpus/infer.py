@@ -173,9 +173,13 @@ def load_model(adapter, load_4bit=False, load_8bit=False):
     lost the caption, so the figure disappeared -- which makes 4-bit a
     last-resort path for an 8 GB card, not a free one.  8-bit is closer.
     """
+    import warnings
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
+    # belts and braces: if any module still has to cast, say it once
+    warnings.filterwarnings("ignore",
+                            message="MatMul8bitLt: inputs will be cast")
     base = base_of(adapter)
     tok = AutoTokenizer.from_pretrained(adapter)
     kw = {"device_map": "cuda"}
@@ -188,6 +192,12 @@ def load_model(adapter, load_4bit=False, load_8bit=False):
                 bnb_4bit_use_double_quant=True)
         else:
             kw["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+            # int8 matmul casts every activation to float16 no matter what,
+            # printing a warning per call when it has to (hundreds of lines
+            # per token, which reads like a runaway loop).  Load in float16
+            # and the cast disappears: the same arithmetic, minus a copy of
+            # the activations on every matmul.
+            kw["dtype"] = torch.float16
     else:
         kw["dtype"] = torch.bfloat16
     src = find_base(base)
@@ -221,6 +231,7 @@ def generate(tok, model, prompts, max_new_tokens):
     budget per step bounded, and treat a single oversized page as a local
     miss rather than a paper-level failure.
     """
+    import time
     import torch
     texts = [tok.apply_chat_template(p, tokenize=False,
                                      add_generation_prompt=True)
@@ -244,7 +255,12 @@ def generate(tok, model, prompts, max_new_tokens):
     if cur:
         groups.append(cur)
 
+    # Progress matters more than it sounds: a page takes tens of seconds to
+    # minutes on a small card, the answer is only printed after every page is
+    # done, and a silent terminal for half an hour reads as a hang.
+    done = 0
     for g in groups:
+        t0 = time.time()
         inputs = tok([texts[i] for i in g], return_tensors="pt",
                      padding=True, padding_side="left").to(model.device)
         n = inputs["input_ids"].shape[1]
@@ -277,6 +293,9 @@ def generate(tok, model, prompts, max_new_tokens):
                 finally:
                     del one
                     torch.cuda.empty_cache()
+        done += len(g)
+        print(f"  {done}/{len(texts)} pages, {time.time() - t0:.0f}s "
+              f"for this batch of {len(g)}", flush=True)
     return outs
 
 
@@ -399,6 +418,9 @@ def main():
     ap.add_argument("--dpi", type=int, default=24,
                     help="resolution of the structural pass (not the crops)")
     ap.add_argument("--max-new", type=int, default=2048)
+    ap.add_argument("--limit", type=int, default=0,
+                    help="convert only the first N pages; a cheap way to see "
+                         "the result and the speed before committing an hour")
     ap.add_argument("--load-4bit", action="store_true",
                     help="4-bit base model: about 2.4 GB instead of 8.2; "
                          "answers can differ from the bf16 run")
@@ -413,6 +435,9 @@ def main():
     rec_path = out / "rec.json"
     with tempfile.TemporaryDirectory() as tmp:
         rec = emitmod.emit(a.pdf, Path(tmp) / "struct", a.dpi)
+    if a.limit and a.limit < len(rec["pages"]):
+        print(f"first {a.limit} of {len(rec['pages'])} pages", flush=True)
+        rec["pages"] = rec["pages"][:a.limit]
     rec_path.write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
 
     if a.gold:

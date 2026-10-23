@@ -83,7 +83,13 @@ python pdf2reading.py paper.pdf -o out/paper
 python pdf2reading.py paper.pdf -o out/paper --load-8bit    # 8 GB card
 python pdf2reading.py paper.pdf -o out/paper --load-4bit    # 6 GB card
 python pdf2reading.py paper.pdf -o out/paper --gold         # no model
+python pdf2reading.py paper.pdf -o out/paper --limit 3      # first 3 pages
 ```
+
+`--limit` is the cheap way to judge speed and looks before committing to a
+whole paper: one page is tens of seconds to a couple of minutes on an 8 GB
+card, so a 30-page paper is a background job. Progress is printed as each
+group of pages finishes.
 
 `--gold` renders the *converter's own* structure. It is the self-test: if a
 page looks wrong in `--gold` too, the bug is in the renderer, not the model.

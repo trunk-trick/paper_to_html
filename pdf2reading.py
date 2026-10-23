@@ -39,6 +39,9 @@ def main():
     ap.add_argument("--dpi", type=int, default=24,
                     help="resolution of the structural pass; crops always "
                          "render at 200 dpi")
+    ap.add_argument("--limit", type=int, default=0,
+                    help="convert only the first N pages -- try the speed and "
+                         "the look on a paper before running all of it")
     a = ap.parse_args()
 
     pdf = Path(a.pdf)
@@ -48,6 +51,8 @@ def main():
     cmd = [sys.executable, str(HERE / "corpus" / "infer.py"),
            "--pdf", str(pdf), "--out", str(a.out),
            "--max-new", str(a.max_new), "--dpi", str(a.dpi)]
+    if a.limit:
+        cmd += ["--limit", str(a.limit)]
     if a.gold:
         cmd.append("--gold")
     else:
