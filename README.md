@@ -59,6 +59,14 @@ HTTPS_PROXY=http://127.0.0.1:7890 ./setup.sh   # Clash 7890, v2rayN 10809
 P2H_NO_PROXY=1 ./setup.sh                      # if no proxy is needed
 ```
 
+**`Using SOCKS proxy, but the 'socksio' package is not installed`** — the
+same socks proxy, one layer down: `huggingface_hub`'s HTTP client is asked
+to walk the proxy on the first hub call. The converter looks for the base
+model in the local cache **by path** and only falls back to the hub when it
+is not there, so a finished install makes no hub call at all. `socksio` is
+in `requirements.txt` for the remaining case; on an older checkout,
+`pip install socksio`, or run without `ALL_PROXY`/`all_proxy`.
+
 **torch: no matching distribution** — check the Python version; wheels exist
 for 3.10–3.14 (measured: `torch 2.11.0+cu128` on Python 3.14). An older
 Python: `PYTHON=python3.12 ./setup.sh`.

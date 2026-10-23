@@ -85,6 +85,86 @@ def parse_labels(text, nlines):
     return blocks, len(missing)
 
 
+def base_of(adapter):
+    """The model the adapter was trained on, from the adapter's own record.
+
+    `adapter_config.json` has written `base_model_name_or_path` since the
+    checkpoint was trained; the tokenizer's `name_or_path` is a copy that
+    some transformers versions fill with the *adapter* directory itself.
+    When that happens `from_pretrained` silently auto-loads the base and
+    applies the LoRA, and `PeftModel.from_pretrained` then applies it again
+    -- a duplicated adapter and a warning that reads like a bug in the
+    adapter file.  Use the recorded name; a path that exists locally wins,
+    because it is a real answer while a name still has to be resolved.
+    """
+    name = ""
+    try:
+        cfg = json.loads((Path(adapter) / "adapter_config.json").read_text())
+        name = cfg.get("base_model_name_or_path") or ""
+    except (OSError, ValueError):
+        pass
+    if name and Path(name).is_dir():
+        return name
+    if not name:
+        try:
+            from transformers import AutoTokenizer
+            t = AutoTokenizer.from_pretrained(adapter)
+            name = t.init_kwargs.get("name_or_path") or ""
+        except Exception:
+            pass
+    return name or "Qwen/Qwen3-4B-Instruct-2507"
+
+
+def find_base(base):
+    """The local snapshot if the model is already downloaded, else `base`.
+
+    `from_pretrained("Qwen/Qwen3-...")` asks the hub for file metadata on
+    every run, even when the whole 8 GB is sitting in the cache -- only an
+    explicitly offline run skips it.  On a machine whose shell exports a
+    `socks://` proxy that request dies before the cache is ever consulted
+    ("Using SOCKS proxy, but the 'socksio' package is not installed"), which
+    looks like a broken model instead of a broken proxy.  Resolving the
+    snapshot here makes a cached install genuinely offline.
+    """
+    try:
+        from huggingface_hub import snapshot_download
+        return snapshot_download(base, local_files_only=True)
+    except Exception:
+        pass
+    # A cache can hold every weight and still be "incomplete" to the hub --
+    # a README, a .gitattributes, anything the download skipped.  Resolve the
+    # file that from_pretrained must have and take its directory.
+    try:
+        from huggingface_hub import try_to_load_from_cache
+        cfg = try_to_load_from_cache(base, "config.json")
+        if isinstance(cfg, str) and Path(cfg).is_file():
+            d = Path(cfg).parent
+            if any(p.suffix in (".safetensors", ".bin") and p.stat().st_size > 0
+                   for p in d.iterdir()):
+                return str(d)
+    except Exception:
+        pass
+    return base
+
+
+def source_note(src):
+    if Path(src).is_dir():
+        return f"{src} (local)"
+    return f"{src} (from the hub -- the first run downloads about 8 GB)"
+
+
+def hub_hint(e):
+    """Turn a hub-transport failure into one the reader can act on."""
+    cause = e
+    while cause is not None:
+        if isinstance(cause, ImportError) and "socksio" in str(cause):
+            return ("the shell exports a socks:// proxy and this Python has no "
+                    "support for it: run `pip install socksio`, or unset "
+                    "ALL_PROXY/all_proxy and retry")
+        cause = cause.__cause__
+    return None
+
+
 def load_model(adapter, load_4bit=False, load_8bit=False):
     """Load the base model and put the adapter on it.
 
@@ -96,8 +176,8 @@ def load_model(adapter, load_4bit=False, load_8bit=False):
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
+    base = base_of(adapter)
     tok = AutoTokenizer.from_pretrained(adapter)
-    base = tok.init_kwargs.get("name_or_path") or "Qwen/Qwen3-4B-Instruct-2507"
     kw = {"device_map": "cuda"}
     if load_4bit or load_8bit:
         from transformers import BitsAndBytesConfig
@@ -110,7 +190,21 @@ def load_model(adapter, load_4bit=False, load_8bit=False):
             kw["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
     else:
         kw["dtype"] = torch.bfloat16
-    model = AutoModelForCausalLM.from_pretrained(base, **kw)
+    src = find_base(base)
+    print(f"base model: {source_note(src)}", flush=True)
+    try:
+        model = AutoModelForCausalLM.from_pretrained(src, **kw)
+    except Exception as e:
+        hint = hub_hint(e)
+        if hint:
+            raise SystemExit(f"error: cannot load {base}: {hint}") from None
+        if src == base and isinstance(e, OSError):
+            raise SystemExit(
+                f"error: cannot load {base}.\n"
+                f"  If it is not downloaded yet: python download_model.py\n"
+                f"  If it is: check HF_HOME points at the cache setup.sh "
+                f"filled.\n  under: {e}") from None
+        raise
     model = PeftModel.from_pretrained(model, adapter)
     model.eval()
     return tok, model

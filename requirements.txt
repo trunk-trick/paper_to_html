@@ -9,6 +9,12 @@ peft>=0.14
 accelerate>=1.0
 pymupdf>=1.24
 
+# Lets huggingface_hub talk to the hub on a machine whose shell exports a
+# socks:// proxy.  Without it the first hub call dies with "Using SOCKS
+# proxy, but the 'socksio' package is not installed" -- the same trap that
+# breaks pip in a fresh venv, one layer down.
+socksio
+
 # --load-4bit only.  Needs a CUDA build; skip it on a 16 GB card.
 bitsandbytes>=0.46
 
