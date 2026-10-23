@@ -45,6 +45,26 @@ Older driver: `./setup.sh cu124`. Python 3.10+ and an NVIDIA card are
 required. `download_model.py --mirror` or `--modelscope` fetches through a
 mirror if the Hugging Face hub is slow.
 
+## If the install fails
+
+**`Missing dependencies for SOCKS support`** — your shell exports a
+`socks://` proxy, and pip inside a fresh venv has no PySocks to speak it.
+`setup.sh` drops the socks proxy automatically when an HTTP proxy is also
+set; if that is not enough:
+
+```bash
+ALL_PROXY= ./setup.sh                 # let pip go direct
+# or, keeping the HTTP proxy:
+HTTPS_PROXY=http://127.0.0.1:7890 ALL_PROXY= ./setup.sh
+```
+
+**torch: no matching distribution** — check the Python version; wheels exist
+for 3.10–3.14 (measured: `torch 2.11.0+cu128` on Python 3.14). An older
+Python: `PYTHON=python3.12 ./setup.sh`.
+
+**torch download is slow** — point it at a mirror:
+`TORCH_INDEX=https://mirror.example/pytorch/whl/cu128 ./setup.sh`.
+
 ## Use
 
 ```bash
