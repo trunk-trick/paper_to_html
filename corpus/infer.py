@@ -465,7 +465,7 @@ def labels_span(tok, model, rec, pno, lo, hi, max_new, depth=0):
     if room < need // 2 and n > 8 and depth < 6:
         mid = lo + n // 2
         print(f"split span {lo}:{hi}: the answer runs to ~{need} tokens, "
-              f"{left} fit", flush=True)
+              f"{left} left after the prompt", flush=True)
         return (labels_span(tok, model, rec, pno, lo, mid, max_new, depth + 1)
                 + labels_span(tok, model, rec, pno, mid, hi, max_new,
                               depth + 1))
