@@ -188,6 +188,31 @@ which is why it reads low even though 83% of individual lines carry the right
 role. Expect the render to be usable on most pages and wrong at some
 specific place on many.
 
+Then six real papers, end to end through the 8-bit path, scored line by line
+against the converter's own structure for the same pages. "Dropped" is a line
+the render cannot show; the converter drops plenty on purpose (table cells,
+figure axis labels, running heads), so the last column is the baseline this
+model has to be read against, not a floor of zero.
+
+| paper | pages | lines | model dropped | converter dropped |
+|---|---|---|---|---|
+| 2019.phi.micro | 14 | 2,401 | 726 | 835 |
+| Prodigy HPCA'21 | 14 | 2,470 | 919 | 943 |
+| 3725843.3756031 | 16 | 2,909 | 768 | 786 |
+| Prefetching Irregular Accesses | 12 | 2,139 | 662 | 400 |
+| ainsworth18-asplos | 15 | 1,646 | 417 | 353 |
+| CRISP | 14 | 1,604 | 194 | 219 |
+| **total** | 85 | 13,169 | **3,686 (28.0%)** | 3,536 (26.9%) |
+
+The model loses 4.2% more lines than the converter would; on four of the six
+papers it loses fewer. The net is one paper: Prefetching Irregular Accesses
+loses 262 more lines than the converter, and the other five together lose
+112 fewer. Its worst pages are grids of one-line table cells, which is
+exactly where "every line exactly once" is hardest to hold. An earlier run on
+the same six papers -- previous parser, no split-on-unparseable fallback, no
+drop comparison -- totalled 3,780 dropped; those three changes recovered 94
+lines, 55 of them on CRISP.
+
 ## Known limitations
 
 - **A wrapped section heading is often split.** `2 How Should the Buttocks Be
