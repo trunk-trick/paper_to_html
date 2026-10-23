@@ -466,9 +466,26 @@ def labels_span(tok, model, rec, pno, lo, hi, max_new, depth=0):
         mid = lo + n // 2
         print(f"split span {lo}:{hi}: the answer runs to ~{need} tokens, "
               f"{left} left after the prompt", flush=True)
-        return (labels_span(tok, model, rec, pno, lo, mid, max_new, depth + 1)
-                + labels_span(tok, model, rec, pno, mid, hi, max_new,
-                              depth + 1))
+        lab = (labels_span(tok, model, rec, pno, lo, mid, max_new, depth + 1)
+               + labels_span(tok, model, rec, pno, mid, hi, max_new,
+                             depth + 1))
+        # A page that had to be split is one the model cannot read whole, and
+        # a slice of it no longer looks like a page.  On a figure that is a
+        # disaster of a particular shape: the axis ticks come back as one
+        # paragraph per number ("1.8", "1.6", "1.4") and the legend as another
+        # block, all of it parsed perfectly and all of it wrong.  The
+        # converter has no such problem -- it drops those lines, and the
+        # figure still appears, because the caption carries its box.  So when
+        # the converter calls most of a split span non-text and the model
+        # calls most of it text, the model is describing the fragments.
+        if depth == 0:
+            g = gold_span(rec, pno, lo, hi)
+            kept, kept_g = n - dropped(lab), n - dropped(g)
+            if kept > 2 * kept_g + 16 and kept > kept_g + n // 4:
+                print(f"  the split answer keeps {kept} of {n} lines, the "
+                      f"converter {kept_g}; using the converter", flush=True)
+                return g
+        return lab
     out = generate(tok, model, [pr], min(want, room))[0]
     lab, _ = parse_labels(out, n)
     if lab is None:
@@ -603,10 +620,19 @@ def main():
 
 def gold_drops(rec, pno, lo=0, hi=None):
     """Lines in [lo, hi) the converter itself would drop.  Free, no model."""
-    pg = rec["pages"][pno]
-    hi = len(pg["lines"]) if hi is None else hi
-    return sum(len([i for i in b["l"] if lo <= i < hi])
-               for b in render_gold(pg) if b.get("r") == "drop")
+    return sum(len(b["l"]) for b in gold_span(rec, pno, lo, hi)
+               if b["r"] == "drop")
+
+
+def gold_span(rec, pno, lo, hi):
+    """The converter's own answer for lines [lo, hi), absolute indices."""
+    hi = len(rec["pages"][pno]["lines"]) if hi is None else hi
+    out = []
+    for b in render_gold(rec["pages"][pno]):
+        l = [i for i in b["l"] if lo <= i < hi]
+        if l:
+            out.append({"r": b["r"], "l": l})
+    return out
 
 
 def render_gold(pg):
