@@ -401,6 +401,21 @@ def shift(blocks, off):
     return [{"r": b["r"], "l": [i + off for i in b["l"]]} for b in blocks]
 
 
+def answer_size(tok, rec, pno, lo, hi):
+    """Tokens the answer for lines [lo, hi) is going to take.  No model, no GPU.
+
+    One index per line plus a little scaffolding per block, so the cost follows
+    the *block count* far more than the line count: 289 lines in 204 blocks
+    (a table of one-line cells) needs more than twice the answer of 289 lines
+    in 40.  The converter's own grouping is the best guide to how many blocks
+    the model will write, and it is already at hand.
+    """
+    lab = [{"r": b["r"], "l": [i - lo for i in b["l"] if lo <= i < hi]}
+           for b in render_gold(rec["pages"][pno])]
+    lab = [b for b in lab if b["l"]]
+    return len(tok(json.dumps(lab, ensure_ascii=False))["input_ids"])
+
+
 def labels_span(tok, model, rec, pno, lo, hi, max_new, depth=0):
     """Labels for lines [lo, hi), splitting a page that cannot fit the context.
 
@@ -419,9 +434,24 @@ def labels_span(tok, model, rec, pno, lo, hi, max_new, depth=0):
                                     add_generation_prompt=True)
         return len(tok(t)["input_ids"])
 
+    # What the answer to this span is going to cost, from the converter's own
+    # grouping, before anything is generated.  Asking every span for the same
+    # 4k is how a card with barely a gigabyte to spare gets an 8-line slice
+    # OOM-killed by its own answer budget -- and, on the way there, how each
+    # split makes four more: a span that cannot hold a generous answer gets
+    # halved even when its own answer was 100 tokens.
+    #
+    # The estimate is a ceiling, and a loose one: measured over 30 pages the
+    # model's own answer ran 0.37x to 1.06x of the converter's block count.
+    # So it sets the budget generously (1.25x) and the split decision
+    # pessimistically (split only when even half of it would not fit), which
+    # keeps a truncated answer -- a generation paid for and thrown away --
+    # rarer than an unnecessary split.
     pr = prompt_for(rec, pno, lo, hi)
     L = ntok(pr)
-    if L + max_new + 64 > LIMIT:
+    need = answer_size(tok, rec, pno, lo, hi)
+    want = min(max_new, int(need * 1.25) + 64)
+    if L + want + 64 > LIMIT:
         # artwork is a hint; the lines are the job.  On a page drawn rule by
         # rule the rectangles outweigh the text several times over, and
         # dropping them is what decides between a served page and a dropped
@@ -430,18 +460,16 @@ def labels_span(tok, model, rec, pno, lo, hi, max_new, depth=0):
         L2 = ntok(pr2)
         if L2 < L:
             pr, L = pr2, L2
-    if L + max_new + 64 > LIMIT and n > 8 and depth < 6:
+    left = LIMIT - L - 64
+    room = max(256, left)
+    if room < need // 2 and n > 8 and depth < 6:
         mid = lo + n // 2
+        print(f"split span {lo}:{hi}: the answer runs to ~{need} tokens, "
+              f"{left} fit", flush=True)
         return (labels_span(tok, model, rec, pno, lo, mid, max_new, depth + 1)
                 + labels_span(tok, model, rec, pno, mid, hi, max_new,
                               depth + 1))
-    # An answer is one index per line plus the block scaffolding: asking for
-    # four tokens a line is generous, and asking for 4k on a card that has
-    # barely a gigabyte to spare is how a page that fits gets OOM-killed by
-    # its own answer budget.
-    want = min(max_new, 256 + 4 * n)
-    budget = min(want, max(256, LIMIT - L - 64))
-    out = generate(tok, model, [pr], budget)[0]
+    out = generate(tok, model, [pr], min(want, room))[0]
     lab, _ = parse_labels(out, n)
     if lab is None:
         # Truncation, a stray bracket, a model that starts over: an
