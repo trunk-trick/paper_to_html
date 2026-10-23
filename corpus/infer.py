@@ -47,14 +47,18 @@ def parse_labels(text, nlines):
     block, never silently merged into a neighbour, because a merged line is
     a wrong paragraph and a dropped line is a visible loss.
     """
-    m = re.search(r"\[.*\]", text, re.S)
+    m = re.search(r"\[", text)
     if not m:
         return None, nlines
+    # raw_decode reads exactly one value and ignores whatever follows.  A
+    # greedy /\[.*\]/ instead swallowed any bracket the model wrote after its
+    # answer -- with a generous token budget it sometimes keeps talking -- and
+    # turned a good answer into "unparseable".
+    body = text[m.start():]
     try:
-        arr = json.loads(m.group(0))
+        arr, _ = json.JSONDecoder().raw_decode(body)
     except json.JSONDecodeError:
         # a truncated array: close it at the last complete object
-        body = text[m.start():]
         cut = body.rfind("}")
         try:
             arr = json.loads(body[:cut + 1] + "]") if cut > 0 else []
@@ -248,8 +252,42 @@ def labels_span(tok, model, rec, pno, lo, hi, max_new, depth=0):
     out = generate(tok, model, [pr], budget)[0]
     lab, _ = parse_labels(out, n)
     if lab is None:
+        # Truncation, a stray bracket, a model that starts over: an
+        # unparseable answer on a long span is better halved than dropped.
+        if n > 8 and depth < 6:
+            mid = lo + n // 2
+            print(f"split span {lo}:{hi} after an unparseable answer",
+                  flush=True)
+            return (labels_span(tok, model, rec, pno, lo, mid, max_new,
+                                depth + 1)
+                    + labels_span(tok, model, rec, pno, mid, hi, max_new,
+                                  depth + 1))
         return [{"r": "drop", "l": list(range(lo, hi))}]
-    return shift(lab, lo)
+    lab = shift(lab, lo)
+    # A page can also come back as "all of this is a drop block", which parses
+    # perfectly and is still useless.  But plenty of pages are mostly dropped
+    # on purpose -- a table's cell fragments, a figure's axis labels -- so
+    # compare with the converter's own structure for this span: only an answer
+    # that drops much more than the converter does is a failure worth
+    # splitting.  One split per page (depth 0): a page that stays lazy in
+    # halves is usually dense text the model genuinely cannot structure, and
+    # each extra split costs another full generation.
+    d_lab = dropped(lab)
+    if n > 8 and depth == 0 and d_lab * 2 > n:
+        d_gold = gold_drops(rec, pno, lo, hi)
+        if d_lab > d_gold + n // 4:
+            mid = lo + n // 2
+            print(f"split span {lo}:{hi}: model dropped {d_lab}, "
+                  f"converter {d_gold} of {n}", flush=True)
+            alt = (labels_span(tok, model, rec, pno, lo, mid, max_new,
+                               depth + 1)
+                   + labels_span(tok, model, rec, pno, mid, hi, max_new,
+                                 depth + 1))
+            if dropped(alt) < d_lab:
+                return alt
+            print(f"  kept the whole-span answer ({d_lab} dropped)",
+                  flush=True)
+    return lab
 
 
 def dropped(blocks):
@@ -301,11 +339,20 @@ def main():
             print(f"page {pno}: {n} lines, "
                   f"{len(lab)} blocks, {miss} repaired->drop")
             labels.append(lab)
-            misses.append(miss)
+            # The retry is scored on dropped lines, which is what the reader
+            # loses; `miss` only counts the repairs, and is zero for a page
+            # the model answered with drop blocks of its own.
+            dropped_here = dropped(lab)
+            misses.append(dropped_here)
             # A truncated answer and an oversized page both lose lines, and
             # both are fixable: retry with twice the budget, which splits the
-            # page if the context still cannot hold it.
-            if miss > max(3, int(0.03 * n)):
+            # page if the context still cannot hold it.  A page answered with
+            # drop blocks parses cleanly, so compare the drops with the
+            # converter's own for that page -- otherwise the worst answers are
+            # the ones never retried.
+            lazy = (dropped_here * 2 > n
+                    and dropped_here > gold_drops(rec, pno) + n // 4)
+            if miss > max(3, int(0.03 * n)) or lazy:
                 retry.append(pno)
         for pno in retry:
             n = len(rec["pages"][pno]["lines"])
@@ -324,6 +371,14 @@ def main():
            "--pdf", a.pdf, "--rec", str(rec_path),
            "--labels", str(lab_path), "--out", str(out)]
     subprocess.run(cmd, check=True)
+
+
+def gold_drops(rec, pno, lo=0, hi=None):
+    """Lines in [lo, hi) the converter itself would drop.  Free, no model."""
+    pg = rec["pages"][pno]
+    hi = len(pg["lines"]) if hi is None else hi
+    return sum(len([i for i in b["l"] if lo <= i < hi])
+               for b in render_gold(pg) if b.get("r") == "drop")
 
 
 def render_gold(pg):

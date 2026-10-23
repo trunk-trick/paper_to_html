@@ -166,9 +166,12 @@ specific place on many.
   on its own line.
 - **Thin subsections may merge into the paragraph below.** `2.5.1` and
   `2.5.2` are sometimes absorbed, which costs a table-of-contents entry.
-- **Dense appendix pages are the weak spot.** Pages over ~30k tokens (dense
-  tables, listings) are split at the midpoint before generation, so a block
-  cannot span the split.
+- **Dense appendix pages are the weak spot.** A page that serialises past the
+  context first loses its artwork rectangles -- that alone takes a measured
+  appendix page from 73,489 to 15,226 tokens -- and is then split at the
+  midpoint, so a block cannot span the split. A page the model answers by
+  dropping most of its lines is split too, but only when it drops clearly more
+  than the converter itself does on the same page.
 - **Non-English text:** trained on English papers. It will run, but the
   heuristics behind caption and heading detection are English-shaped.
 - The renderer is academic-paper shaped: title block, abstract, sections,
