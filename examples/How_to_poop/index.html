@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to poop · reading edition</title>
+<style>
+/* frozen from FDP_paper.html + build.EXTRA_CSS; see TASTE.md */
+:root {
+    color-scheme: dark;
+    --bg: #06070a;
+    --paper: #0e1118;
+    --plate: #05060a;
+    --ink: #e9ebf2;
+    --ink-soft: #a4a9ba;
+    --ink-faint: #7b8294;
+    --hairline: #1d212b;
+    --hairline-strong: #2f3542;
+    --accent: #8aa4ff;
+    --accent-ink: #bdcaff;
+    --accent-wash: #151b2c;
+    --serif: "Newsreader", Charter, "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --sans: "Space Grotesk", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Consolas, "Liberation Mono", monospace;
+    --measure: 45rem;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.68;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-optical-sizing: auto;
+  }
+
+  ::selection { background: #24304f; color: #fff; }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:hover { color: var(--accent-ink); }
+
+  .toprule { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); z-index: 50; }
+
+  /* ---------- shell ---------- */
+  .shell {
+    display: grid;
+    grid-template-columns: 15.5rem minmax(0, var(--measure));
+    gap: 4rem;
+    justify-content: center;
+    padding: 0 2rem 8rem;
+  }
+
+  /* ---------- sidebar ---------- */
+  .side { padding-top: 4.5rem; }
+  .toc { position: sticky; top: 3rem; }
+  .toc__label {
+    font-family: var(--sans); font-size: 11px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-faint); margin: 0 0 .9rem;
+  }
+  .toc ol { list-style: none; margin: 0; padding: 0; }
+  .toc li { margin: 0; }
+  .toc a {
+    display: block; padding: .3rem 0 .3rem .8rem;
+    border-left: 2px solid var(--hairline);
+    color: var(--ink-soft); font-family: var(--sans); font-size: 13px;
+    line-height: 1.4; text-decoration: none;
+  }
+  .toc a:hover { color: var(--ink); border-left-color: var(--hairline-strong); }
+  .toc a.is-active { color: var(--accent-ink); border-left-color: var(--accent); font-weight: 600; }
+  .toc a.toc__sub { padding-left: 1.85rem; font-size: 12px; color: var(--ink-faint); }
+  .toc a.toc__sub.is-active { color: var(--accent-ink); }
+  .toc__aside {
+    margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--hairline);
+    font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--ink-faint);
+  }
+  .toc__aside strong { display: block; color: var(--ink-soft); font-weight: 500; margin-bottom: .3rem; }
+
+  /* ---------- main ---------- */
+  .paper { max-width: var(--measure); padding-top: 4.5rem; min-width: 0; }
+
+  .mast { padding-bottom: 2.4rem; border-bottom: 1px solid var(--hairline-strong); }
+  .mast__kicker {
+    font-family: var(--sans); font-size: 11px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 1.1rem; font-weight: 600;
+  }
+  h1.title {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(2rem, 5vw, 2.85rem);
+    line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 1.4rem; max-width: 34ch;
+  }
+  .authors { font-family: var(--sans); font-size: 14.5px; line-height: 1.6; color: var(--ink); margin: 0 0 .35rem; }
+  .affil { font-family: var(--sans); font-size: 13px; line-height: 1.55; color: var(--ink-soft); margin: 0 0 .9rem; }
+  .venue { font-family: var(--sans); font-size: 12.5px; line-height: 1.65; color: var(--ink-soft); margin: 0; }
+  .venue code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); }
+
+  /* abstract */
+  .abstract { margin: 2.2rem 0 0; }
+  .abstract h2, .kw h2 {
+    font-family: var(--sans); font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-faint); margin: 0 0 .7rem; font-weight: 600;
+  }
+  .abstract p { margin: 0 0 1em; font-size: 18.5px; line-height: 1.66; }
+  .abstract p:last-child { margin-bottom: 0; }
+  .kw { margin: 1.5rem 0 0; font-family: var(--sans); font-size: 13.5px; color: var(--ink-soft); }
+  .kw strong { color: var(--ink); font-weight: 600; }
+
+  /* results strip */
+  .results {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    margin: 2.2rem 0 0; border-top: 1px solid var(--hairline-strong);
+    border-bottom: 1px solid var(--hairline-strong);
+  }
+  .results > div { padding: 1.05rem 1.15rem; }
+  .results > div + div { border-left: 1px solid var(--hairline); }
+  .results .num {
+    font-family: var(--serif); font-weight: 600; font-size: 1.5rem; line-height: 1;
+    color: var(--ink); display: block; letter-spacing: -0.02em;
+  }
+  .results .num em { font-style: normal; color: var(--accent); }
+  .results .lbl {
+    font-family: var(--mono); font-size: 11px; line-height: 1.45;
+    color: var(--ink-faint); display: block; margin-top: .45rem;
+  }
+
+  /* sections */
+  section { margin-top: 3.2rem; }
+  h2.sec {
+    font-family: var(--sans); font-weight: 600; font-size: 1.22rem; line-height: 1.2;
+    margin: 0 0 1.1rem; letter-spacing: -0.005em;
+  }
+  h2.sec .n { font-family: var(--mono); font-weight: 700; color: var(--accent); margin-right: .55rem; font-size: .92em; }
+  h3.sub {
+    font-family: var(--sans); font-weight: 600; font-size: 1rem; line-height: 1.3;
+    margin: 1.9rem 0 .65rem;
+  }
+  h4.subsub {
+    font-family: var(--sans); font-weight: 600; font-size: .875rem; line-height: 1.35;
+    letter-spacing: .01em; color: var(--accent-ink); margin: 1.5rem 0 .55rem;
+  }
+  h4.subsub .n { font-family: var(--mono); font-weight: 700; color: var(--accent); margin-right: .45rem; font-size: .92em; }
+  p { margin: 0 0 1.05em; }
+
+  .runin { font-weight: 600; font-family: var(--sans); font-size: .93em; color: var(--ink); }
+  strong.term { font-weight: 600; }
+
+  code, .mono { font-family: var(--mono); font-size: .86em; }
+  p code, li code, .abstract code, td code {
+    background: var(--accent-wash); color: var(--accent-ink);
+    padding: .06em .34em; border-radius: 0;
+  }
+
+  ul.list { margin: .2rem 0 1.2rem; padding-left: 1.25rem; }
+  ul.list li { margin: 0 0 .5em; }
+  ul.list li::marker { color: var(--accent); }
+  ol.list { margin: .2rem 0 1.2rem; padding-left: 1.5rem; }
+  ol.list li { margin: 0 0 .6em; }
+  ol.list li::marker { color: var(--accent); font-family: var(--mono); font-size: .85em; }
+
+  /* display equations */
+  .eq {
+    margin: 1.3rem 0 1.4rem; padding: .85rem 1.1rem;
+    background: var(--paper); border-left: 3px solid var(--hairline-strong);
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.75; color: var(--ink);
+    overflow-x: auto;
+  }
+  .eq .eqn { color: var(--accent-ink); }
+  .eq sup { font-size: .74em; vertical-align: .55em; line-height: 0; color: var(--accent-ink); }
+  .eq .frac { display: inline-block; vertical-align: middle; text-align: center; margin: 0 .35em; }
+  .eq .frac .num, .eq .frac .den { display: block; padding: 0 .3em; }
+  .eq .frac .num { border-bottom: 1px solid var(--hairline-strong); }
+  .eq .tag { float: right; color: var(--ink-faint); }
+
+  /* drop cap on the opening paragraph */
+  .opening::first-letter {
+    font-family: var(--serif); font-weight: 600;
+    float: left; font-size: 3.5em; line-height: .82;
+    padding: .06em .1em 0 0; color: var(--accent);
+  }
+
+  /* sidebar box (the magazine's inset) */
+  .inset {
+    margin: 2rem 0; padding: 1.3rem 1.5rem 1.1rem;
+    background: var(--paper); border: 1px solid var(--hairline-strong);
+  }
+  .inset h3 {
+    font-family: var(--sans); font-size: 11px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 .9rem; font-weight: 700;
+  }
+  .inset p { font-size: 15.5px; line-height: 1.6; }
+  .inset p:last-child { margin-bottom: 0; }
+
+  /* figures — the plates are white-background rasters, so they are inverted
+     into the page's own black; the frame keeps its own border outside the
+     filter, and the crop's own margin turns black with the rest of it. */
+  figure.plate { margin: 1.9rem 0 2.1rem; }
+  .plate__frame {
+    border: 1px solid var(--hairline-strong); background: var(--plate);
+    line-height: 0; overflow: hidden;
+  }
+  .plate__frame img {
+    display: block; margin: 0 auto; max-width: 100%; height: auto;
+    filter: invert(1) hue-rotate(180deg) brightness(.96) contrast(.94);
+  }
+  .plate--col .plate__frame { max-width: 30rem; margin: 0 auto; }
+  figcaption {
+    margin-top: .65rem; font-family: var(--sans); font-size: 12.5px; line-height: 1.55;
+    color: var(--ink-soft);
+  }
+  figcaption .capnum { font-family: var(--mono); font-weight: 700; color: var(--accent); margin-right: .35rem; }
+
+  /* tables */
+  figure.table { margin: 1.7rem 0 1.9rem; }
+  table { border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 13.5px; line-height: 1.5; }
+  caption { caption-side: top; text-align: left; font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft); margin-bottom: .55rem; }
+  caption .capnum { font-family: var(--mono); font-weight: 700; color: var(--accent); margin-right: .35rem; }
+  th, td { border-top: 1px solid var(--hairline-strong); border-bottom: 1px solid var(--hairline-strong); padding: .5rem .8rem .5rem 0; text-align: left; vertical-align: top; }
+  thead th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint); font-weight: 500; border-top: 0; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-size: 13px; }
+  tbody tr.hl td { background: var(--accent-wash); font-weight: 600; }
+  .tblnote { font-family: var(--sans); font-size: 12px; line-height: 1.55; color: var(--ink-faint); margin: .6rem 0 0; }
+  .tblnote sup { font-family: var(--mono); font-size: .8em; color: var(--accent); }
+  .tbl-1 { max-width: 34rem; }
+  .tbl-2 { max-width: 44rem; }
+  .tbl-3 { max-width: 44rem; }
+  .tbl-4 { max-width: 44rem; }
+  .tbl-6 { max-width: 40rem; }
+  .tbl-cfg { max-width: 26rem; }
+  .tbl-thr { max-width: 32rem; }
+  table.cfg td, table.cfg th { padding-right: .6rem; }
+  table.cfg td:first-child { font-family: var(--mono); color: var(--accent-ink); }
+  /* Table 4 is printed as two rows of twelve and fourteen columns; the same
+     numbers read better as two columns of benchmarks side by side */
+  .tbl-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0 2rem; }
+  .tbl-split table { max-width: 22rem; }
+  .tbl-cap {
+    font-family: var(--sans); font-size: 12.5px; line-height: 1.5;
+    color: var(--ink-soft); margin: 0 0 .55rem;
+  }
+  .tbl-cap .capnum { font-family: var(--mono); font-weight: 700; color: var(--accent); margin-right: .35rem; }
+
+  /* citations */
+  sup.ref {
+    font-family: var(--mono); font-size: .62em; font-weight: 500;
+    vertical-align: super; line-height: 0; margin-left: .06em;
+  }
+  sup.ref a { color: var(--accent); text-decoration: none; }
+  sup.ref a:hover { text-decoration: underline; }
+  sup.fnref { font-family: var(--mono); font-size: .62em; color: var(--accent); vertical-align: super; line-height: 0; }
+  sup.fnref a { color: var(--accent); text-decoration: none; }
+
+  /* footnotes */
+  .fn {
+    margin: .9rem 0 1.3rem; padding: .65rem .95rem .7rem;
+    border-left: 3px solid var(--accent); background: var(--accent-wash);
+    font-size: 13.5px; line-height: 1.55; color: var(--ink-soft);
+  }
+  .fn .fn-n { font-family: var(--mono); font-weight: 700; color: var(--accent); margin-right: .4rem; }
+
+  /* references */
+  ol.refs { list-style: none; margin: 1rem 0 0; padding: 0; }
+  ol.refs li {
+    position: relative; padding: .45rem 0 .45rem 2.4rem; font-size: 13.5px; line-height: 1.55;
+    color: var(--ink-soft); border-bottom: 1px solid var(--hairline);
+  }
+  ol.refs li .refnum {
+    position: absolute; left: 0; top: .45rem; font-family: var(--mono); font-size: 12px;
+    color: var(--accent); font-weight: 500; min-width: 1.9rem;
+  }
+  ol.refs li .t { color: var(--ink); font-weight: 600; }
+  ol.refs li:target { background: var(--accent-wash); }
+
+  footer {
+    margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--hairline-strong);
+    font-family: var(--sans); font-size: 12.5px; line-height: 1.7; color: var(--ink-faint);
+  }
+  footer .doi { font-family: var(--mono); font-size: 11.5px; }
+
+  .toc-toggle { display: none; }
+
+  @media (max-width: 940px) {
+    .shell { grid-template-columns: 1fr; gap: 0; padding: 0 1.4rem 6rem; }
+    .side { padding-top: 0; }
+    .toc { position: static; }
+    .toc-toggle {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-family: var(--sans); font-size: 13px; color: var(--accent-ink);
+      background: var(--accent-wash); border: 1px solid var(--accent);
+      padding: .5rem .9rem; border-radius: 0; cursor: pointer; margin: 1.4rem 0 0;
+    }
+    .toc nav { display: none; margin-top: 1rem; }
+    .toc nav.open { display: block; }
+    .results { grid-template-columns: 1fr; }
+    .results > div + div { border-left: 0; border-top: 1px solid var(--hairline); }
+    .plate--col .plate__frame { max-width: 100%; }
+    .tbl-1, .tbl-2, .tbl-3, .tbl-4, .tbl-6, .tbl-cfg, .tbl-thr { max-width: 100%; }
+    .tbl-split { grid-template-columns: 1fr; gap: 0; }
+    .tbl-split table { max-width: 100%; }
+    /* a five-column table cannot shrink below its min-content width, so give
+       it its own scroller instead of letting it run off the page */
+    figure.table { overflow-x: auto; }
+    figure.table > table { min-width: 0; }
+    .eq .tag { float: none; display: block; text-align: right; }
+  }
+
+  /* this paper's table of contents is long enough to outrun a laptop
+     viewport, so the sticky column scrolls inside itself */
+  @media (min-width: 941px) {
+    .toc nav { max-height: calc(100vh - 8rem); overflow-y: auto; }
+  }
+
+/* ---- additions for the batch reflow pages ---- */
+.rawcap {
+  font-family: var(--sans); font-size: 13px; line-height: 1.55;
+  color: var(--ink-soft); border-left: 2px solid var(--hairline-strong);
+  padding-left: .9rem; margin: 1.5rem 0;
+}
+.rawcap .capnum, .capnum { color: var(--accent); font-family: var(--mono);
+  font-weight: 700; margin-right: .4rem; }
+p.fnl { font-size: 15.5px; line-height: 1.62; color: var(--ink-soft);
+  margin: 0 0 .8em; }
+.tablewrap {
+  border: 1px solid var(--hairline-strong); background: var(--plate);
+  padding: .35rem; overflow-x: auto; line-height: 0;
+}
+.tablewrap img { display: block; margin: 0 auto; max-width: 100%; height: auto;
+  filter: invert(1) hue-rotate(180deg) brightness(.96) contrast(.94); }
+figure.table { margin: 1.8rem 0 2rem; }
+.mast__note { font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
+  color: var(--ink-faint); text-transform: uppercase; margin: .9rem 0 0; }
+/* bibliography URLs offer no break opportunities (slashes, commas, dots) and
+   used to push the document 40px wide inside a 308px viewport */
+.paper p, .paper li, .paper h1, .paper h2, .paper h3,
+.paper figcaption, .paper td, .paper th, .paper code, .paper a {
+  overflow-wrap: anywhere;
+}
+
+/* the long table of contents scrolls inside the sticky column; an unstyled
+   scrollbar arrives as a light strip on the dark page */
+.toc nav { scrollbar-width: thin; scrollbar-color: var(--hairline-strong) transparent; }
+.toc nav::-webkit-scrollbar { width: 8px; }
+.toc nav::-webkit-scrollbar-thumb { background: var(--hairline-strong); }
+.toc nav::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="toprule"></div>
+<div class="shell">
+  <aside class="side">
+    <div class="toc">
+      <p class="toc__label">Contents</p>
+      <button class="toc-toggle" type="button" aria-expanded="false" aria-controls="toc">Contents ▾</button>
+      <nav id="toc"><ol>
+        <li><a href="#s1-introduction">1 Introduction</a></li>
+        <li><a href="#s2-how-should-the-buttocks-">2 How Should the Buttocks Be Aligned with the</a></li>
+        <li><a href="#s3-pan-so-as-not-to-defecat" class="toc__sub">Pan So As Not to Defecate Outside It?</a></li>
+        <li><a href="#s4-direction-of-use" class="toc__sub">2.1 Direction of Use</a></li>
+        <li><a href="#s5-positioning-directly-abo" class="toc__sub">2.2 Positioning Directly Above the Pan</a></li>
+        <li><a href="#s6-removal-of-trousers" class="toc__sub">2.3 Removal of Trousers</a></li>
+        <li><a href="#s7-commencement-of-defecati" class="toc__sub">2.4 Commencement of Defecation</a></li>
+        <li><a href="#s8-advanced-techniques" class="toc__sub">2.5 Advanced Techniques</a></li>
+        <li><a href="#s9-what-else-must-we-do-aft">3 What Else Must We Do After Defecation?</a></li>
+        <li><a href="#s10-wiping-the-buttocks" class="toc__sub">3.1 Wiping the Buttocks</a></li>
+        <li><a href="#s11-disposal-of-toilet-paper" class="toc__sub">3.2 Disposal of Toilet Paper</a></li>
+        <li><a href="#s12-pulling-up-trousers" class="toc__sub">3.3 Pulling Up Trousers</a></li>
+        <li><a href="#s13-summary">4 Summary</a></li>
+        <li><a href="#s14-references">References</a></li>
+      </ol></nav>
+      <p class="toc__aside"><strong>Source</strong>How_to_poop.pdf</p>
+    </div>
+  </aside>
+  <main class="paper">
+    <header class="mast">
+      <p class="mast__kicker">Re-typeset from PDF · 2 pages</p>
+      <h1 class="title" title="How to poop">How to poop</h1>
+      <p class="authors">A step-by-step protocol for squat-toilet use in shared student housing · Kuan Zhang and trunktrick</p>
+    </header>
+    <div class="flow">
+      <p>Abstract—Some students may have deficiencies in their physiological constitution or mode of thinking, or may simply lack experience in defecation, and therefore do not know how to defecate correctly; problems large and small occur continually. This paper is intended to guide such students. It specifies the correct orientation of the body relative to the squat pan, positioning directly above the pan, the preparatory removal of trousers, and the stable execution of defecation, and it then describes two advanced techniques—smartphone use and concomitant urination—that may be attempted only after the basic procedure has been mastered. Finally, it sets out the post-defecation procedures of wiping, disposal of toilet paper, dressing, and flushing, and identifies flushing as the decisive step: if flushing is not successfully completed, the entire operation is deemed to have failed. Keywords—squat toilet, defecation, sanitation, hygiene, flushing, student housing</p>
+      <h2 class="sec" id="s1-introduction"><span class="n">1</span> Introduction</h2>
+      <p>Some students may have deficiencies in their physiological constitution or mode of thinking, or may lack experience in defecation, and therefore do not know how to defecate correctly; problems large and small occur continually. This paper is intended to guide such students through the process.1 The guidance proceeds in three stages: alignment of the body with the pan (Section 2), the act of defecation together with the advanced techniques that may accompany it (Section 2.5), and the procedures required after defecation (Section 3).</p>
+      <h2 class="sec" id="s2-how-should-the-buttocks-"><span class="n">2</span> How Should the Buttocks Be Aligned with the</h2>
+      <h3 class="sub" id="s3-pan-so-as-not-to-defecat">Pan So As Not to Defecate Outside It?</h3>
+      <h3 class="sub" id="s4-direction-of-use"><span class="n">2.1</span> Direction of Use</h3>
+      <p>After entering the cubicle and locking the door, squat down with your face toward the door, so that the water tank is directly behind your body. Do not let the door be at your left or right side (do not be surprised—this is a real case), do not turn your back to the door, and do not defecate in the reverse direction (Fig. 1).</p>
+      <h3 class="sub" id="s5-positioning-directly-abo"><span class="n">2.2</span> Positioning Directly Above the Pan</h3>
+      <p>Position yourself directly above the pan. In particular, do not squat too far back, lest the feces fall outside the pan or even onto the water tank (do not be surprised—this too is a real case).</p>
+      <h3 class="sub" id="s6-removal-of-trousers"><span class="n">2.3</span> Removal of Trousers</h3>
+      <p>Remove all trousers, including outer trousers, thermal underwear, underpants, and any other garments of this kind.</p>
+      <h3 class="sub" id="s7-commencement-of-defecati"><span class="n">2.4</span> Commencement of Defecation</h3>
+      <p>Having completed the above steps, you may begin to defecate. Keep the body stable throughout; do not sway forward, backward, left, or right. Those defecating for the first time may hold the door or the partition for support, so as to prevent accidents.</p>
+      <p class="fnl">1This paper is the English-language edition of the Chinese guidance note 拉屎须知 [1]. Section numbering has been adapted to the present format; the substance follows the original.</p>
+      <figure class="plate"><div class="plate__frame"><img src="img/g01.png" alt="Orientation within the cubicle (plan view). The door is at the bottom of each panel and the water tank is the gray bar at the top; the arrow shows the direction faced. (a) Correct:" width="676" height="622" loading="lazy"></div><figcaption><span class="capnum">Figure 1.</span> Orientation within the cubicle (plan view). The door is at the bottom of each panel and the water tank is the gray bar at the top; the arrow shows the direction faced. (a) Correct: facing the door, tank behind. (b) Door at the user’s left. (c) Door at the user’s right. (d) Back to the door.</figcaption></figure>
+      <h3 class="sub" id="s8-advanced-techniques"><span class="n">2.5</span> Advanced Techniques</h3>
+      <p>Once the above steps have been mastered sufficiently, the following advanced techniques may be attempted.</p>
+      <p>2.5.1 Use of a Smartphone While squatting, you may take out a mobile phone and browse the Internet. The purpose is to relieve the boredom of defecation. Before doing so, however, you must first lower your head and confirm that your feces can fall accurately into the pan; only when this has been confirmed may you begin browsing. Take care throughout to prevent the phone from falling.</p>
+      <p>2.5.2 Concomitant Urination While squatting, you may also attend to urination. This requires the simultaneous use of hand and eye: the trajectory must be observed and adjusted at all times so that urine does not fall outside the pan (this too is a real case; on one occasion it caused the entire third-floor restroom to be covered in urine). The maneuver demands superior skill and is not recommended for beginners or amateurs to attempt lightly.</p>
+      <h2 class="sec" id="s9-what-else-must-we-do-aft"><span class="n">3</span> What Else Must We Do After Defecation?</h2>
+      <h3 class="sub" id="s10-wiping-the-buttocks"><span class="n">3.1</span> Wiping the Buttocks</h3>
+      <p>Ordinarily, toilet paper that meets hygiene standards should be used to clean the buttocks; under special circumstances, however, other cleaning materials may be employed. The method of wiping differs from person to person, and there is no right or wrong; this paper does not elaborate on it.</p>
+      <h3 class="sub" id="s11-disposal-of-toilet-paper"><span class="n">3.2</span> Disposal of Toilet Paper</h3>
+      <p>Some students may have questions on this point; we will elaborate on it in detail later.2</p>
+      <h3 class="sub" id="s12-pulling-up-trousers"><span class="n">3.3</span> Pulling Up Trousers</h3>
+      <p>This step is the exact reverse of Section 2.3. All the trousers removed in the foregoing steps must now be put back on. Special note. If improper operation causes feces to adhere to the hands, do not smear the feces on any part of the cubicle, including the water tank (this too is a real case). After completing the wiping procedure, wash the hands carefully.</p>
+      <h2 class="sec" id="s13-summary"><span class="n">4</span> Summary</h2>
+      <p>This paper has sought to set out the points at which problems are most likely to arise in the course of defecation and to give appropriate technical essentials for each operational step. It is hoped that all students in Dormitory No. 1 will study it conscientiously and grasp its content, and will together follow a new, civilized path of defecation consistent with the development of Dormitory No. 1.</p>
+      <h2 class="sec" id="s14-references">References</h2>
+      <p>[1] K. Zhang and trunktrick, “拉屎须知” [How to poop], internal guidance note, Dormitory No. 1, 2026.</p>
+      <p class="fnl">2The source document defers this topic to a later discussion that does not appear in the text. The sentence is retained here for fidelity to the original.</p>
+    </div>
+  </main>
+</div>
+</body>
+</html>

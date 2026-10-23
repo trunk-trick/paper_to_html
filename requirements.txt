@@ -1,0 +1,18 @@
+# Inference only -- no training dependencies.
+#
+# torch is installed by setup.sh from the CUDA index that matches your card;
+# do not let this file pull a default build over it.  An RTX 50 card (5060,
+# 5070, 5080, 5090) needs a cu128 or newer wheel: torch 2.7 is the first with
+# sm_120 kernels.
+transformers>=4.55
+peft>=0.14
+accelerate>=1.0
+pymupdf>=1.24
+
+# --load-4bit only.  Needs a CUDA build; skip it on a 16 GB card.
+bitsandbytes>=0.46
+
+# serve.py only.
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.9
