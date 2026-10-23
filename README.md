@@ -226,7 +226,18 @@ lines, 55 of them on CRISP.
   appendix page from 73,489 to 15,226 tokens -- and is then split at the
   midpoint, so a block cannot span the split. A page the model answers by
   dropping most of its lines is split too, but only when it drops clearly more
-  than the converter itself does on the same page.
+  than the converter itself does on the same page. Splitting a *text* page has
+  a price: one 134-line page cut in half came back with 42 lines dropped
+  against the converter's 24.
+- **A split figure page is handed back to the converter.** A slice of a page
+  does not look like a page, and on a full-page figure the model answers with
+  the artwork's own labels -- an axis reading `1.8`, `1.6`, `1.4` came back as
+  one paragraph per number, 163 blocks of them, parsed perfectly and useless.
+  The converter drops those lines and the figure still appears, because the
+  caption carries its box, so when a page had to be split and the model keeps
+  far more of it than the converter does, the converter's structure is used
+  for that page. It prints `the split answer keeps 314 of 397 lines, the
+  converter 19; using the converter` when it does.
 - **Non-English text:** trained on English papers. It will run, but the
   heuristics behind caption and heading detection are English-shaped.
 - The renderer is academic-paper shaped: title block, abstract, sections,
