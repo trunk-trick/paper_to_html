@@ -21,30 +21,98 @@ EOF
 # pip's HTTP stack has no PySocks, so it dies with "Missing dependencies for
 # SOCKS support" before it downloads anything.  The same machine almost always
 # also exposes an HTTP proxy port, and that one needs no extra package.
+proxy_of() { eval "printf '%s' \"\${$1:-}\""; }
+
+# Does a HEAD request through this HTTP proxy succeed?  Proves TCP, CONNECT,
+# TLS and an HTTP status in well under a second, and fails just as fast when
+# the url is not an HTTP proxy at all.
+probe_proxy() {
+    command -v curl >/dev/null 2>&1 || return 1
+    curl -s --max-time 8 --proxy "$1" -f -I -o /dev/null https://pypi.org/simple/
+}
+
+# The same test with no proxy: TCP + TLS handshake only, no download, so the
+# answer does not depend on the index page's size.  IPv4 first, because on a
+# network with a broken IPv6 route getaddrinfo's default order hangs for tens
+# of seconds before falling back.  The alarm bounds DNS, which socket timeouts
+# do not cover.
+probe_direct() {
+    "$PY" - <<'EOF' 2>/dev/null
+import signal, socket, ssl
+signal.alarm(15)
+ctx = ssl.create_default_context()
+for fam in (socket.AF_INET, socket.AF_INET6):
+    try:
+        s = socket.socket(fam, socket.SOCK_STREAM)
+        s.settimeout(4)
+        s.connect(socket.getaddrinfo("pypi.org", 443, fam, socket.SOCK_STREAM)[0][4])
+        ctx.wrap_socket(s, server_hostname="pypi.org").close()
+        break
+    except Exception:
+        continue
+else:
+    raise SystemExit(1)
+EOF
+}
+
 socks=""
 for v in ALL_PROXY all_proxy HTTPS_PROXY https_proxy HTTP_PROXY http_proxy; do
-    eval "val=\${$v:-}"
-    case "$val" in *socks*) socks=1 ;; esac
+    case "$(proxy_of "$v")" in *socks*) socks="$socks $v=$(proxy_of "$v")" ;; esac
 done
 if [ -n "$socks" ]; then
-    http="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-}}}}"
-    case "$http" in
-        "" | *socks*)
-            cat >&2 <<'EOF'
-error: only a socks:// proxy is set, and this venv has no PySocks.
-       Either point the HTTP proxy at the same host, or run:
+    # Any http(s):// proxy, not just the first variable that is set: a shell
+    # can export HTTPS_PROXY=socks:// and HTTP_PROXY=http:// on the same host.
+    http=""
+    for v in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy; do
+        val="$(proxy_of "$v")"
+        case "$val" in "" | *socks*) ;; *) http="$val"; break ;; esac
+    done
+    first="$(echo "$socks" | sed -n '1s/^ *[A-Za-z_]*=//p')"
+    same="$(printf '%s' "$first" | sed -E 's#^socks5?h?://#http://#')"
+    if [ "${P2H_NO_PROXY:-0}" = 1 ]; then
+        echo "note: P2H_NO_PROXY=1; pip will run with no proxy"
+        unset ALL_PROXY all_proxy HTTPS_PROXY https_proxy HTTP_PROXY http_proxy
+    elif [ -n "$http" ] && probe_proxy "$http"; then
+        echo "note: socks proxy present; using the HTTP proxy $http for pip"
+        unset ALL_PROXY all_proxy
+        # Overwrite every scheme-specific variable: pip reads HTTPS_PROXY for
+        # https urls, and that one may still hold the socks url.
+        export HTTPS_PROXY="$http" https_proxy="$http" HTTP_PROXY="$http" http_proxy="$http"
+    elif [ "$same" != "$first" ] && probe_proxy "$same"; then
+        echo "note: the socks proxy also answers HTTP on the same port;"
+        echo "      using $same for pip"
+        unset ALL_PROXY all_proxy
+        export HTTPS_PROXY="$same" HTTP_PROXY="$same" https_proxy="$same" http_proxy="$same"
+    elif probe_direct; then
+        echo "note: socks proxy present, but PyPI is reachable directly;"
+        echo "      ignoring the proxy for this install.  The first download"
+        echo "      may pause for a minute while pip times out IPv6 addresses."
+        unset ALL_PROXY all_proxy HTTPS_PROXY https_proxy HTTP_PROXY http_proxy
+    else
+        cat >&2 <<EOF
+error: a socks:// proxy is set and a fresh venv has no PySocks yet:
+         $(echo "$socks" | sed 's/^ //')
+       pip stops before downloading, because it cannot speak socks://.
+       This script tried the HTTP proxies and the direct connection and
+       both failed, so pip has no route it can use.
 
-           ALL_PROXY= ./setup.sh
+       What to do: start (or open) your proxy tool and point pip at its
+       HTTP port -- Clash 7890, v2rayN 10809, sing-box 7890 are usual:
 
-       (pip needs no proxy at all when the index is reachable directly.)
+              HTTPS_PROXY=http://127.0.0.1:7890 ./setup.sh
+
+       If you know PyPI works without any proxy, force that:
+
+              P2H_NO_PROXY=1 ./setup.sh
+
+       Proxies currently set:
 EOF
-            exit 1
-            ;;
-        *)
-            echo "note: socks proxy found; using $http for pip instead"
-            unset ALL_PROXY all_proxy
-            ;;
-    esac
+        for v in ALL_PROXY all_proxy HTTPS_PROXY https_proxy HTTP_PROXY http_proxy; do
+            val="$(proxy_of "$v")"
+            [ -n "$val" ] && echo "           $v=$val" >&2
+        done
+        exit 1
+    fi
 fi
 
 "$PY" -m venv .venv

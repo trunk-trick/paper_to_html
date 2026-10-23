@@ -49,13 +49,14 @@ mirror if the Hugging Face hub is slow.
 
 **`Missing dependencies for SOCKS support`** — your shell exports a
 `socks://` proxy, and pip inside a fresh venv has no PySocks to speak it.
-`setup.sh` drops the socks proxy automatically when an HTTP proxy is also
-set; if that is not enough:
+`setup.sh` handles this itself: it uses any `http://` proxy in the
+environment, then tries the socks port over HTTP, then tries a direct
+connection, and only stops if none of those reach PyPI. In that last case,
+give it the HTTP port of your proxy tool:
 
 ```bash
-ALL_PROXY= ./setup.sh                 # let pip go direct
-# or, keeping the HTTP proxy:
-HTTPS_PROXY=http://127.0.0.1:7890 ALL_PROXY= ./setup.sh
+HTTPS_PROXY=http://127.0.0.1:7890 ./setup.sh   # Clash 7890, v2rayN 10809
+P2H_NO_PROXY=1 ./setup.sh                      # if no proxy is needed
 ```
 
 **torch: no matching distribution** — check the Python version; wheels exist
